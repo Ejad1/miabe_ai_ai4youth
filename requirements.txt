@@ -1,13 +1,23 @@
+# --- Core Frameworks ---
 fastapi
 uvicorn
+gunicorn
+streamlit
+requests
 python-dotenv
+
+# --- Authentification & DB ---
+pymongo
+bcrypt
+certifi
+tomli
+
+# --- AI & Vector Store ---
 langchain
 faiss-cpu
 numpy
-gunicorn
-streamlit
 
-# Fournisseurs de modèles
+# --- Fournisseurs de modèles ---
 langchain-mistralai
 langchain-openai
 langchain-google-genai
