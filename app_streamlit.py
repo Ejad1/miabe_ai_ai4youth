@@ -104,7 +104,7 @@ if user:
                 masked = re.sub(r"://(.*?):(.*?)@", "://***:***@", uri)
             except Exception:
                 pass
-            st.sidebar.caption(f"Mongo config: {masked}")
+            # st.sidebar.caption(f"Mongo config: {masked}")
     except Exception:
         pass
     # Show DB connection status in sidebar for debugging
@@ -112,11 +112,11 @@ if user:
         try:
             # cheap check: list collections (may raise if not connected)
             _ = _db.list_collection_names()
-            st.sidebar.success("MongoDB: connecté")
+            # st.sidebar.success("MongoDB: connecté")
         except Exception:
-            st.sidebar.error("MongoDB: connexion impossible")
-    else:
-        st.sidebar.warning("MongoDB: non configuré (utilisation locale)")
+            st.sidebar.error("Connexion impossible")
+    #else:
+        # st.sidebar.warning("MongoDB: non configuré (utilisation locale)")
 
     # Load user's sessions from MongoDB and display them
     sessions = []
@@ -145,7 +145,7 @@ if user:
                 doc = create_new_session(sessions_coll, user_identifier, "Nouvelle discussion")
                 # debug: record created session id
                 st.session_state['last_db_session_created'] = doc.get('session_id')
-                st.sidebar.info(f"Session créée en base: {st.session_state.get('last_db_session_created')}")
+                # st.sidebar.info(f"Session créée en base: {st.session_state.get('last_db_session_created')}")
                 # load the new session messages and id
                 st.session_state['messages'] = doc.get('messages', [])
                 st.session_state['active_session_id'] = doc.get('session_id')
