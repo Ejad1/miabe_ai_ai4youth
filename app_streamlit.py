@@ -1,41 +1,21 @@
+import sys
+import os
 import streamlit as st
 import requests
-import os
 from typing import List, Dict
-try:
-    from MiabéIA.auth.db import (
-        get_mongo_collections,
-        create_new_session,
-        load_session_messages,
-        save_message,
-    )
-except Exception:
-    try:
-        from auth.db import (
-            get_mongo_collections,
-            create_new_session,
-            load_session_messages,
-            save_message,
-        )
-    except Exception:
-        from .auth.db import (
-            get_mongo_collections,
-            create_new_session,
-            load_session_messages,
-            save_message,
-        )
+
+# Add the project root to the Python path to allow absolute imports from the root.
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+from auth.db import (
+    get_mongo_collections,
+    create_new_session,
+    load_session_messages,
+    save_message,
+)
 
 # Import auth UI helper
-try:
-    # normal package import (works when MiabéIA is on PYTHONPATH)
-    from MiabéIA.auth.ui import require_auth_or_stop, logout
-except Exception:
-    # fallback: import from local package using relative path
-    try:
-        from auth.ui import require_auth_or_stop, logout
-    except Exception:
-        # last resort: relative import (when running as a module)
-        from .auth.ui import require_auth_or_stop, logout
+from auth.ui import require_auth_or_stop, logout
 
 # Configuration de l'API Miabé IA
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/chat")
