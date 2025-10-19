@@ -248,17 +248,11 @@ if prompt := st.chat_input("Posez votre question à Miabé  IA..."):
 
     # Prépare et affiche la réponse de l'assistant en streaming
     with st.chat_message("assistant"):
-        # Accumulate chunks but don't write them one-by-one to avoid word-by-word rendering
-        assistant_chunks = []
-
-        for chunk in stream_api_response(prompt, st.session_state.messages[:-1]):
-            assistant_chunks.append(chunk)
-
-        # final assembled response
-        full_response = "".join(assistant_chunks)
-
-        # Display assembled response as a single block
-        st.markdown(full_response)
+        # Utilisez st.write_stream pour afficher les morceaux (chunks) au fur et à mesure
+        # et obtenir la réponse complète à la fin.
+        full_response = st.write_stream(
+            stream_api_response(prompt, st.session_state.messages[:-1])
+        )
 
         # Append to session state and persist
         st.session_state.messages.append({"role": "assistant", "content": full_response})

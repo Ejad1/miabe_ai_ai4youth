@@ -7,8 +7,13 @@
         },
         {
             "username": "EJAD",
-            "password": "ejad1234",
+            "password": " à complèter ",
             "email": "ejad0323@gmail.com"
+        },
+        {
+            "username": "Test User",
+            "password": "d}3c4]jL'SP%ULa",
+            "email": "test.user@gmail.com"
         }
     ]
 }
