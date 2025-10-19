@@ -1,0 +1,13 @@
+# Fichiers d'environnement
+.env
+secrets.toml
+
+# Fichiers Python
+__pycache__/
+*.pyc
+
+# Notebooks
+*.ipynb
+
+# Vector store (si vous le reconstruisez en ligne)
+# vector_store/

@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-dotenv
+langchain
+faiss-cpu
+numpy
+gunicorn
+
+# Fournisseurs de modèles
+langchain-mistralai
+langchain-openai
+langchain-google-genai
+langchain-anthropic
+langchain-groq
