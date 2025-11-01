@@ -13,12 +13,17 @@ CONTEXT_NAME = "Université de Lomé"
 # Clés API (chargées depuis .env)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+# Modèles Anthropic
+ANTHROPIC_COMPLETION_MODEL = "claude-3-7-sonnet-20250219"
 
 # Modèles OpenAI
 OPENAI_COMPLETION_MODEL = "gpt-4.1-mini"
 OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
 OPENAI_CLASSIFIER_MODEL = "gpt-4.1-mini"
 
+# Modèles Mistral
 MISTRAL_COMPLETION_MODEL = "mistral-small-latest"
 MISTRAL_CLASSIFIER_MODEL = "mistral-small-latest"
 MISTRAL_EMBEDDING_MODEL = "mistral-embed"
@@ -41,7 +46,8 @@ INTENT_CATEGORIES = [
 
 PREDEFINED_ANSWERS = {
     "Salutations": f"Bonjour ! Je suis Miabé IA. Comment puis-je vous aider aujourd'hui concernant {{CONTEXT_NAME}} ?",
-    "Inapproprie": f"Je suis un Gouv Bot, un assistant au service de {{CONTEXT_NAME}}. Je suis là pour vous aider."
+    "Saluations" : f"Bonjour ! Je suis Miabé IA. Comment puis-je vous aider aujourd'hui concernant {{CONTEXT_NAME}} ?",
+    "Inapproprie": f"Je suis Miabé IA., un assistant au service de {{CONTEXT_NAME}}. Je suis là pour vous aider."
 }
 
 
@@ -133,7 +139,7 @@ SYSTEM_PROMPT_RAG = f"""### RÔLE ET PERSONA DU SYSTÈME (Miabé IA)
 **RÉPONSE DE L'ASSISTANT (dans la même langue que la question) :**"""
 
 
-SYSTEM_PROMPT_PREDEFINED_GENERATOR = f"""Tu es un assistant de conversation multilingue et poli.
+SYSTEM_PROMPT_PREDEFINED_GENERATOR = f"""Tu es Miabé IA un assistant de conversation multilingue et poli. Tu rends les informations universitaires simples, accessibles et sans stress.
 La question originale de l'utilisateur était : "{{question}}".
 Cette question correspond à l'intention : "{{intent}}".
 La réponse standard en français pour cette intention est : "{{french_answer}}".
