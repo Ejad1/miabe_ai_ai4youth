@@ -3,7 +3,7 @@
 Ce module fournit deux modèles Pydantic légers pour valider et sérialiser
 les utilisateurs avant insertion en base MongoDB :
 - StudentUser : étudiant(e)
-- AffiliateUser : utilisateur affilié à l'université (personnel, visiteur, etc.)
+- AffiliateUser : visiteur (personnel, enseignant, externe, etc.)
 
 Chaque modèle propose une méthode `to_db()` qui renvoie un dict prêt à être
 inséré dans la collection `users` en respectant quelques conventions du projet
@@ -101,9 +101,10 @@ class StudentUser(BaseModel):
 
 
 class AffiliateUser(BaseModel):
-    """Modèle pour un utilisateur affilié à l'université de Lomé.
+    """Modèle pour un utilisateur visiteur.
 
-    Champs : nom, prenoms, affiliation_ul (bool ou string), email, contact
+    Inclut : personnel UL, enseignants, chercheurs, partenaires externes, etc.
+    Champs : nom, prenoms, affiliation_ul (bool), affiliation_details, email, contact
     """
 
     nom: str

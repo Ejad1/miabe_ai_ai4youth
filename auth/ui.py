@@ -276,7 +276,7 @@ def render_signup_form(users_coll=None, key: str = "signup") -> Optional[Dict[st
                     <h2 style='margin:0'>Créer un compte</h2>
                   </div>""", unsafe_allow_html=True)
 
-    tabs = st.tabs(["Étudiant", "Affilié"])
+    tabs = st.tabs(["Étudiant", "Visiteur"])
     user_data = None
 
     # --- Étudiant ---
@@ -314,7 +314,7 @@ def render_signup_form(users_coll=None, key: str = "signup") -> Optional[Dict[st
                 )
                 user_data = _handle_signup_submission(users_coll, model)
 
-    # --- Affilié ---
+    # --- Visiteur ---
     with tabs[1]:
         st.markdown("##### Informations générales")
         nom = st.text_input("Nom", key=f"{key}_af_nom")
@@ -323,13 +323,13 @@ def render_signup_form(users_coll=None, key: str = "signup") -> Optional[Dict[st
         contact = st.text_input("Contact (téléphone)", key=f"{key}_af_contact")
         password = st.text_input("Mot de passe", type="password", key=f"{key}_af_password")
 
-        st.markdown("##### Détails Affiliation")
-        affiliation_ul = st.checkbox("Affilié à l'Université de Lomé", value=True, key=f"{key}_af_ul")
-        affiliation_details = st.text_input("Détails d'affiliation (ex: département)", key=f"{key}_af_details")
+        st.markdown("##### Informations complémentaires")
+        affiliation_ul = st.checkbox("Lié à l'Université de Lomé", value=True, key=f"{key}_af_ul")
+        affiliation_details = st.text_input("Précisions (ex: département, fonction)", key=f"{key}_af_details")
 
-        if st.button("S'inscrire comme Affilié", key=f"{key}_af_submit"):
+        if st.button("S'inscrire comme Visiteur", key=f"{key}_af_submit"):
             if not (nom and prenoms and email and password):
-                st.error("Veuillez remplir tous les champs obligatoires pour l'inscription affilié.")
+                st.error("Veuillez remplir tous les champs obligatoires pour l'inscription visiteur.")
             else:
                 model = AffiliateUser(
                     nom=nom,
