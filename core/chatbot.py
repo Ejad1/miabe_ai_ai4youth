@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Generator
 # Imports LangChain - à adapter selon le fournisseur actif
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_anthropic import ChatAnthropic
 # from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 # from langchain_anthropic import ChatAnthropic
 # from langchain_groq import ChatGroq
@@ -38,10 +39,18 @@ class Chatbot:
         seed = 42
         top_p = 1.0
 
+        # self.completion_model = ChatAnthropic(
+        #     model=config.ANTHROPIC_COMPLETION_MODEL,
+        #     api_key=config.ANTHROPIC_API_KEY,
+        #     temperature=0.4,
+        #     max_tokens=1000,
+        #     top_p=top_p
+        # )
+
         self.completion_model = ChatOpenAI(
-            model_name=config.OPENAI_COMPLETION_MODEL, 
+            model=config.OPENAI_COMPLETION_MODEL,
             api_key=config.OPENAI_API_KEY,
-            temperature=0.3,
+            temperature=0.4,
             max_tokens=1000,
             top_p=top_p,
             seed=seed
@@ -52,7 +61,7 @@ class Chatbot:
             api_key=config.MISTRAL_API_KEY,
             temperature=0.0,
             max_tokens=10,
-            top_p=top_p,
+            top_p=top_p
         )
 
         self.rewriter_model = ChatMistralAI(
@@ -60,7 +69,7 @@ class Chatbot:
             api_key=config.MISTRAL_API_KEY,
             temperature=0.5,
             max_tokens=100,
-            top_p=top_p,
+            top_p=top_p
         )
 
         self.embedding_model = MistralAIEmbeddings(
@@ -169,7 +178,7 @@ class Chatbot:
         intent = self._classify_intent(rewritten_question)
         logging.info(f"Intention détectée: {intent}")
 
-        if intent in config.PREDEFINED_ANSWERS:
+        if intent in config.PREDEFINED_ANSWERS or intent == "Saluations":
             # Stream la réponse prédéfinie générée par l'IA
             for chunk in self.predefined_chain.stream({
                 "CONTEXT_NAME": config.CONTEXT_NAME, 
