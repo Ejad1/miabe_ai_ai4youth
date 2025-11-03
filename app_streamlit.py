@@ -3,6 +3,7 @@ import os
 import streamlit as st
 import requests
 from typing import List, Dict
+from datetime import datetime
 
 # Add the project root to the Python path to allow absolute imports from the root.
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -28,6 +29,7 @@ st.title("Miabé  IA")
 # This ensures that even when st.session_state is reset (on page refresh),
 # the user is automatically logged back in if a valid cookie exists.
 # We do this BEFORE checking st.session_state['user'] to handle refresh correctly.
+is_refresh = False
 if 'user' not in st.session_state or not st.session_state.get('user'):
     # Try to restore from cookie first
     from auth.ui import _restore_session_from_cookie, _get_users_coll
@@ -36,6 +38,7 @@ if 'user' not in st.session_state or not st.session_state.get('user'):
         restored = _restore_session_from_cookie(users_coll)
         if restored:
             st.session_state['user'] = restored
+            is_refresh = True  # C'est un refresh, pas une nouvelle connexion
 
 # If a user object exists in session_state (either from previous state or just restored),
 # use it; otherwise require authentication.
@@ -46,8 +49,10 @@ else:
 
 # If we just logged in (session now has user but we haven't refreshed layout),
 # force one rerun so auth forms are removed from the page.
+is_new_login = False
 if user and st.session_state.get('_post_login_done') is not True:
     st.session_state['_post_login_done'] = True
+    is_new_login = True  # C'est une nouvelle connexion
     try:
         import time
 
@@ -97,26 +102,44 @@ if user:
     if cols is not None:
         _client, _db, _users_coll, sessions_coll = cols
     
-    # CRITICAL: Restore active session after page refresh
-    # If active_session_id is missing (after refresh), load the most recent discussion
+    # CRITICAL: Gestion intelligente des discussions
+    # - Nouvelle connexion → créer nouvelle discussion
+    # - Refresh → restaurer la discussion active (la plus récente)
     if sessions_coll is not None and 'active_session_id' not in st.session_state:
-        try:
-            user_id = user.get('user_id') if isinstance(user, dict) else None
-            user_email = user.get('email') if isinstance(user, dict) else None
-            
-            # Find the most recent session for this user
-            most_recent = sessions_coll.find_one(
-                {"$or": [{"user_id": user_id}, {"user_email": user_email}]},
-                sort=[("updated_at", -1)]
-            )
-            
-            if most_recent:
-                # Restore the active session
-                st.session_state['active_session_id'] = most_recent.get('session_id')
-                st.session_state['messages'] = most_recent.get('messages', [])
-        except Exception as e:
-            # Non-critical: if restore fails, user can manually select a discussion
-            pass
+        if is_new_login:
+            # NOUVELLE CONNEXION: Créer une nouvelle discussion
+            try:
+                user_id = user.get('user_id') if isinstance(user, dict) else None
+                user_email = user.get('email') if isinstance(user, dict) else None
+                
+                new_session = create_new_session(
+                    sessions_coll,
+                    user_email or user_id,
+                    f"Discussion {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+                )
+                st.session_state['active_session_id'] = new_session.get('session_id')
+                st.session_state['messages'] = new_session.get('messages', [])
+            except Exception as e:
+                pass
+        elif is_refresh:
+            # REFRESH: Restaurer la discussion la plus récente
+            try:
+                user_id = user.get('user_id') if isinstance(user, dict) else None
+                user_email = user.get('email') if isinstance(user, dict) else None
+                
+                # Find the most recent session for this user
+                most_recent = sessions_coll.find_one(
+                    {"$or": [{"user_id": user_id}, {"user_email": user_email}]},
+                    sort=[("updated_at", -1)]
+                )
+                
+                if most_recent:
+                    # Restore the active session
+                    st.session_state['active_session_id'] = most_recent.get('session_id')
+                    st.session_state['messages'] = most_recent.get('messages', [])
+            except Exception as e:
+                # Non-critical: if restore fails, user can manually select a discussion
+                pass
     # Also attempt to load and show resolved conf for debugging (mask password)
     try:
         from MiabéIA.auth import db as _auth_db
