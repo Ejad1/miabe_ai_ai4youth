@@ -12,6 +12,8 @@ bcrypt
 certifi
 tomli
 pydantic
+email-validator
+extra-streamlit-components
 
 # --- AI & Vector Store ---
 langchain
