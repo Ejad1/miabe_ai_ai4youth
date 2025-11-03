@@ -11,6 +11,7 @@ pymongo
 bcrypt
 certifi
 tomli
+pydantic
 
 # --- AI & Vector Store ---
 langchain

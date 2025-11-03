@@ -25,6 +25,10 @@ import streamlit as st
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 import certifi
+from datetime import datetime
+import uuid
+from pymongo.collection import Collection
+from typing import Dict, Any, List
 
 try:
     import tomllib  # Python 3.11+
@@ -74,11 +78,14 @@ def _load_mongo_config_from_local() -> Optional[dict]:
     """Tente de charger la section [mongo] depuis un secrets.toml local.
     Retourne dict ou None.
     """
-    if tomllib is None:
-        return None
+    # Prefer using tomllib/tomli if available for robust parsing
     for path in _read_local_secrets_candidates():
         try:
-            if path.is_file():
+            if not path.is_file():
+                continue
+
+            # If we have a TOML parser available, use it
+            if tomllib is not None:
                 with open(path, 'rb') as f:
                     data = tomllib.load(f)
                 mongo_conf = data.get('mongo')
@@ -88,7 +95,35 @@ def _load_mongo_config_from_local() -> Optional[dict]:
                         'database': mongo_conf.get('database', 'ia_chat_db'),
                         'collection': mongo_conf.get('collection', 'user_sessions')
                     }
+
+            # Fallback: simple, tolerant INI-like parser for the [mongo] section
+            # This allows reading a minimal secrets.toml even when no toml lib is installed.
+            text = path.read_text(encoding='utf8')
+            lines = [ln.strip() for ln in text.splitlines()]
+            in_mongo = False
+            mongo_vals: dict = {}
+            for ln in lines:
+                if not ln or ln.startswith('#'):
+                    continue
+                if ln.startswith('[') and ln.endswith(']'):
+                    in_mongo = (ln[1:-1].strip() == 'mongo')
+                    continue
+                if not in_mongo:
+                    continue
+                if '=' in ln:
+                    k, v = ln.split('=', 1)
+                    k = k.strip()
+                    v = v.strip().strip('"').strip("'")
+                    mongo_vals[k] = v
+
+            if mongo_vals.get('uri'):
+                return {
+                    'uri': mongo_vals.get('uri'),
+                    'database': mongo_vals.get('database', 'ia_chat_db'),
+                    'collection': mongo_vals.get('collection', 'user_sessions')
+                }
         except Exception:
+            # Ignore parse errors and try next candidate
             continue
     return None
 
@@ -165,11 +200,6 @@ def ensure_user_indexes(users_coll: Any) -> None:
         st.warning(f"Impossible de créer l'index unique sur email: {e}")
 
 
-# MiabéIA/chat/db.py
-from datetime import datetime
-import uuid
-from pymongo.collection import Collection
-from typing import Dict, Any, List
 
 def _now_iso() -> str:
     return datetime.now().isoformat()
@@ -219,3 +249,23 @@ def save_message(coll: Collection, session_id: str, role: str, content: str) -> 
         },
         upsert=True  # crée la session si elle n’existe pas
     )
+
+
+def delete_session(coll: Collection, session_id_or_obj: str) -> int:
+    """Supprime une session identifiée soit par son `session_id`, soit par son `_id`.
+
+    Retourne le nombre de documents supprimés (0 ou 1).
+    """
+    try:
+        # Try delete by session_id first
+        res = coll.delete_one({"session_id": session_id_or_obj})
+        if res.deleted_count:
+            return int(res.deleted_count)
+
+        # Fallback: try deleting by _id (in case an ObjectId or string id was passed)
+        # We attempt to use it as-is - PyMongo will handle string _id if that's how docs were stored.
+        res2 = coll.delete_one({"_id": session_id_or_obj})
+        return int(res2.deleted_count)
+    except Exception:
+        # On any error return 0 and let caller surface messages
+        return 0

@@ -12,6 +12,7 @@ from auth.db import (
     create_new_session,
     load_session_messages,
     save_message,
+    delete_session,
 )
 
 # Import auth UI helper
@@ -23,9 +24,21 @@ API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/chat")
 # Page title
 st.title("Miabé  IA")
 
-# If a user object exists in session_state we use it; otherwise ask for auth.
-# Submitting Streamlit forms triggers an automatic rerun, so after a successful
-# login/signup the next run will skip the auth block and show the chat.
+# CRITICAL: Always attempt to restore session from cookie on page load/refresh
+# This ensures that even when st.session_state is reset (on page refresh),
+# the user is automatically logged back in if a valid cookie exists.
+# We do this BEFORE checking st.session_state['user'] to handle refresh correctly.
+if 'user' not in st.session_state or not st.session_state.get('user'):
+    # Try to restore from cookie first
+    from auth.ui import _restore_session_from_cookie, _get_users_coll
+    users_coll = _get_users_coll()
+    if users_coll is not None:
+        restored = _restore_session_from_cookie(users_coll)
+        if restored:
+            st.session_state['user'] = restored
+
+# If a user object exists in session_state (either from previous state or just restored),
+# use it; otherwise require authentication.
 if 'user' in st.session_state and st.session_state['user']:
     user = st.session_state['user']
 else:
@@ -83,6 +96,27 @@ if user:
     sessions_coll = None
     if cols is not None:
         _client, _db, _users_coll, sessions_coll = cols
+    
+    # CRITICAL: Restore active session after page refresh
+    # If active_session_id is missing (after refresh), load the most recent discussion
+    if sessions_coll is not None and 'active_session_id' not in st.session_state:
+        try:
+            user_id = user.get('user_id') if isinstance(user, dict) else None
+            user_email = user.get('email') if isinstance(user, dict) else None
+            
+            # Find the most recent session for this user
+            most_recent = sessions_coll.find_one(
+                {"$or": [{"user_id": user_id}, {"user_email": user_email}]},
+                sort=[("updated_at", -1)]
+            )
+            
+            if most_recent:
+                # Restore the active session
+                st.session_state['active_session_id'] = most_recent.get('session_id')
+                st.session_state['messages'] = most_recent.get('messages', [])
+        except Exception as e:
+            # Non-critical: if restore fails, user can manually select a discussion
+            pass
     # Also attempt to load and show resolved conf for debugging (mask password)
     try:
         from MiabéIA.auth import db as _auth_db
@@ -160,27 +194,74 @@ if user:
             st.sidebar.error(f"Impossible de créer la discussion: {e}")
 
     st.sidebar.markdown("### Vos discussions")
+    
+    # Inject CSS to remove button boxes for icon buttons and align them horizontally
+    st.sidebar.markdown("""
+    <style>
+    /* Remove borders and background for icon buttons (edit/delete) */
+    div[data-testid="column"] > div > div > div > button[kind="secondary"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0.2rem 0.3rem !important;
+        font-size: 1.2rem !important;
+        color: #aaa !important;
+    }
+    div[data-testid="column"] > div > div > div > button[kind="secondary"]:hover {
+        color: #fff !important;
+        background: transparent !important;
+    }
+    /* Reduce column padding for tight horizontal layout */
+    div[data-testid="column"] {
+        padding: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     for s in sessions:
-            sid = s.get('session_id') or str(s.get('_id'))
-            title = s.get('title') or s.get('created_at') or 'Discussion'
-            cols = st.sidebar.columns([8, 2])
-            with cols[0]:
-                if st.sidebar.button(title, key=f"load_{sid}"):
-                    # load messages into session_state
+        sid = s.get('session_id') or str(s.get('_id'))
+        title = s.get('title') or s.get('created_at') or 'Discussion'
+
+        # Prepare per-session state keys
+        editing_key = f"editing_{sid}"
+        confirm_key = f"confirm_delete_{sid}"
+
+        # Columns: title (clickable) | edit | delete
+        # Use narrow columns for the icon buttons so they appear on the same line
+        # and visually smaller. DO NOT prefix buttons with st.sidebar inside columns.
+        cols = st.sidebar.columns([6, 0.7, 0.7])
+
+        with cols[0]:
+            if st.button(title, key=f"load_{sid}"):
+                # load messages into session_state
+                try:
+                    msgs = load_session_messages(sessions_coll, sid)
+                except Exception:
+                    msgs = s.get('messages', [])
+                st.session_state['messages'] = msgs
+                # remember active session id
+                st.session_state['active_session_id'] = sid
+                _do_rerun()
+
+        # Edit (pencil) - small icon button on same row
+        with cols[1]:
+            # Use a compact label for a smaller visual footprint
+            if st.button("✎", key=f"edit_btn_{sid}"):
+                st.session_state[editing_key] = True
+
+        # Delete (trash)
+        with cols[2]:
+            # Compact trash icon
+            if st.button("🗑", key=f"del_btn_{sid}"):
+                st.session_state[confirm_key] = True
+
+        # If editing, show inline rename controls below the row
+        if st.session_state.get(editing_key):
+            new_title = st.sidebar.text_input("Nom de la discussion", value=title, key=f"title_input_{sid}")
+            rename_cols = st.sidebar.columns([1, 1])
+            with rename_cols[0]:
+                if st.sidebar.button("Enregistrer", key=f"save_title_{sid}"):
                     try:
-                        msgs = load_session_messages(sessions_coll, sid)
-                    except Exception:
-                        msgs = s.get('messages', [])
-                    st.session_state['messages'] = msgs
-                    # remember active session id
-                    st.session_state['active_session_id'] = sid
-                    _do_rerun()
-            with cols[1]:
-                # rename inline
-                new_title = st.sidebar.text_input("", value=title, key=f"title_{sid}")
-                if st.sidebar.button("Renommer", key=f"rename_{sid}"):
-                    try:
-                        # update by _id if present, otherwise by session_id
                         if sessions_coll is not None:
                             if s.get('_id'):
                                 filter_q = {"_id": s.get('_id')}
@@ -189,9 +270,42 @@ if user:
                             sessions_coll.update_one(filter_q, {"$set": {"title": new_title, "updated_at": __import__('datetime').datetime.utcnow().isoformat()}})
                         else:
                             st.sidebar.warning("Impossible de renommer: base de données non configurée")
+                        # exit edit mode and refresh
+                        st.session_state[editing_key] = False
                         _do_rerun()
                     except Exception as e:
                         st.sidebar.error(f"Erreur renommage: {e}")
+            with rename_cols[1]:
+                if st.sidebar.button("Annuler", key=f"cancel_title_{sid}"):
+                    st.session_state[editing_key] = False
+
+        # If delete was requested, show confirm UI
+        if st.session_state.get(confirm_key):
+            confirm_cols = st.sidebar.columns([1, 1])
+            with confirm_cols[0]:
+                if st.sidebar.button("Confirmer suppression", key=f"confirm_del_{sid}"):
+                    try:
+                        if sessions_coll is not None:
+                            # Attempt to delete by session_id first
+                            deleted = delete_session(sessions_coll, s.get('session_id') or sid)
+                            if deleted:
+                                # If the deleted session was active, clear messages/active id
+                                if st.session_state.get('active_session_id') == sid:
+                                    st.session_state['messages'] = []
+                                    st.session_state['active_session_id'] = None
+                                st.sidebar.success("Discussion supprimée")
+                            else:
+                                st.sidebar.error("Impossible de supprimer la discussion (non trouvée)")
+                        else:
+                            st.sidebar.warning("Impossible de supprimer: base de données non configurée")
+                        # clear confirm flag and rerun to refresh list
+                        st.session_state[confirm_key] = False
+                        _do_rerun()
+                    except Exception as e:
+                        st.sidebar.error(f"Erreur suppression: {e}")
+            with confirm_cols[1]:
+                if st.sidebar.button("Annuler", key=f"cancel_del_{sid}"):
+                    st.session_state[confirm_key] = False
 
 # Initialisation de l'historique de la conversation
 if "messages" not in st.session_state:
@@ -234,15 +348,13 @@ if prompt := st.chat_input("Posez votre question à Miabé  IA..."):
                 st.session_state['last_db_session_created'] = doc.get('session_id')
                 st.session_state['active_session_id'] = doc.get('session_id')
                 active_sid = doc.get('session_id')
-                st.sidebar.info(f"Session créée en base: {active_sid}")
 
             # Save the just-submitted user message into the active DB session
             save_message(sessions_coll, active_sid, 'user', prompt)
             st.session_state['last_db_save'] = (active_sid, 'user')
-            st.sidebar.write(f"Dernière sauvegarde DB: message utilisateur -> {active_sid}")
     except Exception as e:
-        # non-critical: continue even if persistence fails, but surface a small note
-        st.sidebar.warning(f"Echec sauvegarde message utilisateur: {e}")
+        # Non-critical: continue even if persistence fails
+        pass
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -266,11 +378,10 @@ if prompt := st.chat_input("Posez votre question à Miabé  IA..."):
                 st.session_state['last_db_session_created'] = doc.get('session_id')
                 st.session_state['active_session_id'] = doc.get('session_id')
                 active_sid = doc.get('session_id')
-                st.sidebar.info(f"Session créée en base: {active_sid}")
 
             if sessions_coll is not None and active_sid:
                 save_message(sessions_coll, active_sid, 'assistant', full_response)
                 st.session_state['last_db_save'] = (active_sid, 'assistant')
-                st.sidebar.write(f"Dernière sauvegarde DB: réponse assistant -> {active_sid}")
         except Exception as e:
-            st.sidebar.warning(f"Echec sauvegarde réponse assistant: {e}")
+            # Non-critical: continue even if persistence fails
+            pass
