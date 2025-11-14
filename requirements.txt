@@ -1,0 +1,21 @@
+# Requirements pour le Scrapping Web - Miabé IA
+# Version AWS Batch avec dépendances pour S3
+
+# === Core Web Scraping ===
+requests==2.31.0
+beautifulsoup4==4.12.3
+lxml==5.1.0
+markdownify==0.11.6
+tqdm==4.66.1
+
+# === AWS Services ===
+boto3==1.34.30
+botocore==1.34.30
+
+# === Document Conversion (Docling) ===
+docling==1.10.0
+
+# === Utilitaires ===
+urllib3==2.1.0
+charset-normalizer==3.3.2
+python-dateutil
